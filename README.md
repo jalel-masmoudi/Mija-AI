@@ -14,6 +14,8 @@ Camera access works on `localhost` or HTTPS. The built-in sample cabinet is the 
 
 The included `Dockerfile` deploys unchanged to Railway, Render, Fly.io, or any Docker host. Set `OPENAI_API_KEY` as a server-side environment variable and expose port `3000` (or set `PORT`).
 
+The production app is deployed on Vercel at https://mija-ai.vercel.app. Its Vercel Functions are in `api/`; set `OPENAI_API_KEY` in Vercel to enable GPT-5.6. Supabase project migrations live in `supabase/migrations/` and secure per-user assembly progress plus private manual uploads.
+
 ## How it uses OpenAI
 
 - `POST /api/chat` sends the active assembly step and user question to GPT-5.6.

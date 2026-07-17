@@ -17,6 +17,6 @@
     <main id="app" aria-live="polite"></main>
     <input id="manualInput" type="file" accept="application/pdf,image/*" hidden />
     <script src="app.js"></script>
-    <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');</script>
+    <script>if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister()));</script>
   </body>
 </html>
