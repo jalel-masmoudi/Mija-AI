@@ -22,6 +22,8 @@ The production app is deployed on Vercel at https://mija-ai.vercel.app. Its Verc
 - `POST /api/verify` sends the active step plus the captured image to GPT-5.6 vision and requires strict JSON: `pass`, `fix`, or `unclear`, a confidence score, and a correction.
 - The API key only exists on the Bun server, never in browser code.
 
+If the OpenAI project has no remaining quota, the client keeps its local, step-aware fallback guidance available for a reliable demo; GPT-5.6 verification resumes automatically once credits are available.
+
 ## Build Week
 
 Track: **Apps for Your Life**. Codex accelerated the mobile UI, browser-camera flow, structured product data, and this small secure API boundary. GPT-5.6 powers contextual assembly help and visual verification.
@@ -29,3 +31,7 @@ Track: **Apps for Your Life**. Codex accelerated the mobile UI, browser-camera f
 ## Limitations
 
 This hackathon MVP supports one structured furniture guide. Upload parsing, arbitrary product recognition, manufacturer data, accounts, and cloud sync are intentionally out of scope.
+
+## Native companion
+
+`mobile/` contains the Expo TypeScript companion app with a touch-first assembly screen. The deployed web app remains the judged demo surface today; add Expo Camera and the native 3D viewer after the hackathon flow is locked.
