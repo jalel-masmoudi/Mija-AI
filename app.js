@@ -24,6 +24,9 @@ const saved = JSON.parse(localStorage.getItem('mija-session') || 'null');
 const state = saved || { screen: 'home', step: 0, completed: [], verified: [], manualName: '', cameraOn: false, correctionSeen: false };
 let mediaStream;
 const save = () => localStorage.setItem('mija-session', JSON.stringify({ ...state, cameraOn: false }));
+const mode = () => localStorage.getItem('mija-ai-mode');
+const demoMode = () => mode() !== 'key';
+const aiHeaders = () => ({ 'content-type': 'application/json', ...(demoMode() ? {} : { 'x-mija-openai-key': localStorage.getItem('mija-openai-key') }) });
 const esc = (value) => String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
 const current = () => product.steps[state.step];
 const progress = () => Math.round((state.completed.length / product.steps.length) * 100);
@@ -35,8 +38,13 @@ function frame(content, name = 'Mija AI') {
 }
 
 function home() {
+  if (!mode()) return chooseMode();
   const hasBuild = state.step > 0 || state.completed.length;
-  frame(`<section class="home-screen"><div class="eyebrow"><span></span> ASSEMBLY, MADE CLEAR</div><h1>Build it right.<br><em>Feel certain.</em></h1><p class="intro">Your camera-ready guide for every screw, panel, and “does this look right?” moment.</p><button class="primary wide" data-action="start">Start a new build <b>→</b></button>${hasBuild ? `<article class="resume-card"><div class="cabinet-icon">▥</div><div><span>CONTINUE BUILD</span><h2>${product.name}</h2><p>Step ${state.step + 1} of ${product.steps.length} · ${progress()}% complete</p></div><button class="round-button" data-action="guide" aria-label="Continue build">→</button><div class="card-progress"><i style="width:${progress()}%"></i></div></article>` : `<div class="how"><span>✦</span><p><strong>Start with anything you have.</strong><br>Scan a product code or upload a manual to get your guide.</p></div>`}</section><section class="home-visual"><div class="visual-head"><span class="live-dot"></span> YOUR NEXT BUILD</div>${cabinetModel()}<div class="assistant-note"><span>✦</span><p><b>Hi, I’m Mija.</b><br>I’ll help you make every step feel easy.</p></div></section><footer><span>Made for real-world building.</span><button data-action="reset" class="reset">Reset demo</button></footer>`);
+  frame(`<section class="home-screen"><div class="eyebrow"><span></span> ASSEMBLY, MADE CLEAR</div><h1>Build it right.<br><em>Feel certain.</em></h1><p class="intro">Your camera-ready guide for every screw, panel, and “does this look right?” moment.</p><button class="primary wide" data-action="start">Start a new build <b>→</b></button>${hasBuild ? `<article class="resume-card"><div class="cabinet-icon">▥</div><div><span>CONTINUE BUILD</span><h2>${product.name}</h2><p>Step ${state.step + 1} of ${product.steps.length} · ${progress()}% complete</p></div><button class="round-button" data-action="guide" aria-label="Continue build">→</button><div class="card-progress"><i style="width:${progress()}%"></i></div></article>` : `<div class="how"><span>✦</span><p><strong>Start with anything you have.</strong><br>Scan a product code or upload a manual to get your guide.</p></div>`}</section><section class="home-visual"><div class="visual-head"><span class="live-dot"></span> YOUR NEXT BUILD</div>${cabinetModel()}<div class="assistant-note"><span>✦</span><p><b>Hi, I’m Mija.</b><br>I’ll help you make every step feel easy.</p></div></section><footer><span>${demoMode() ? 'Demo Mode · no API key required.' : 'Live AI · key saved on this device.'}</span><button data-action="settings" class="reset">AI mode</button></footer>`);
+}
+
+function chooseMode() {
+  frame(`<section class="welcome-screen"><div class="eyebrow"><span></span> WELCOME TO MIJA AI</div><h1>Build with<br><em>confidence.</em></h1><p class="intro">Try the complete assembly experience instantly, or connect your own OpenAI key for live responses.</p><button class="primary wide" data-action="demo-mode">Try Demo Mode <b>→</b></button><p class="mode-caption">No API key required · preloaded guide and demo AI</p><div class="key-card"><span class="mini-label">OPTIONAL LIVE AI</span><b>Use your own OpenAI API key</b><input id="apiKey" type="password" autocomplete="off" placeholder="sk-…" aria-label="OpenAI API key" /><button class="secondary wide" data-action="save-key">Save and continue</button><small>Your key stays in this browser and is only forwarded for live requests. Mija does not save it in its database.</small></div></section>`);
 }
 
 function start() {
@@ -99,7 +107,7 @@ async function startCamera() {
   try { mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }); document.querySelector('#camera').srcObject = mediaStream; status.textContent = 'Camera ready. Center your work, then capture a photo.'; }
   catch { status.textContent = 'Camera access is unavailable here. Choose “Use demo photo” to continue.'; }
 }
-async function verifyImage(image) { try { const response = await fetch('/api/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image, step: current() }) }); const data = await response.json(); analysis(data.error ? 'photo' : data); } catch { analysis('photo'); } }
+async function verifyImage(image) { if (demoMode()) return analysis('photo'); try { const response = await fetch('/api/verify', { method: 'POST', headers: aiHeaders(), body: JSON.stringify({ image, step: current() }) }); const data = await response.json(); analysis(data.error ? 'photo' : data); } catch { analysis('photo'); } }
 function stopCamera() { mediaStream?.getTracks().forEach(track => track.stop()); mediaStream = undefined; }
 function markDone() { const id = current().id; if (!state.completed.includes(id)) state.completed.push(id); save(); if (id === product.steps.length) return done(); state.step += 1; save(); guide(); }
 function bind() {
@@ -107,6 +115,7 @@ function bind() {
     const action = button.dataset.action;
     if (action !== 'camera' && action !== 'start-camera' && action !== 'capture') stopCamera();
     if (action === 'home') home(); if (action === 'start') start(); if (action === 'guide') guide(); if (action === 'camera') camera(); if (action === 'chat') chat();
+    if (action === 'settings') chooseMode(); if (action === 'demo-mode') { localStorage.setItem('mija-ai-mode', 'demo'); home(); } if (action === 'save-key') { const key = document.querySelector('#apiKey').value.trim(); if (key) { localStorage.setItem('mija-openai-key', key); localStorage.setItem('mija-ai-mode', 'key'); home(); } }
     if (action === 'upload') manualInput.click(); if (action === 'demo' || action === 'code') { state.manualName = action === 'code' ? (document.querySelector('#productCode').value.trim() || 'Product code') : 'Demo cabinet'; state.step = 0; save(); guide(); }
     if (action === 'start-camera') startCamera(); if (action === 'capture') { const video = document.querySelector('#camera'); const canvas = document.querySelector('#snapshot'); if (video?.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d').drawImage(video, 0, 0); } stopCamera(); verifyImage(canvas?.toDataURL('image/jpeg', .8)); }
     if (action === 'sample') analysis('pass'); if (action === 'fixed') { state.correctionSeen = true; analysis('pass'); }
@@ -117,6 +126,6 @@ function bind() {
   document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => addMessage(button.dataset.question)));
   document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); const input = document.querySelector('#question'); if (input.value.trim()) { addMessage(input.value.trim()); input.value = ''; } });
 }
-async function addMessage(question) { const messages = document.querySelector('#messages'); messages.insertAdjacentHTML('beforeend', `<div class="message user">${esc(question)}</div><div class="message mija" id="thinking">Thinking…</div>`); messages.scrollTop = messages.scrollHeight; try { const response = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, step: current() }) }); const data = await response.json(); document.querySelector('#thinking').textContent = data.answer || answer(question); } catch { document.querySelector('#thinking').textContent = answer(question); } }
+async function addMessage(question) { const messages = document.querySelector('#messages'); messages.insertAdjacentHTML('beforeend', `<div class="message user">${esc(question)}</div><div class="message mija" id="thinking">${demoMode() ? answer(question) : 'Thinking…'}</div>`); messages.scrollTop = messages.scrollHeight; if (demoMode()) return; try { const response = await fetch('/api/chat', { method: 'POST', headers: aiHeaders(), body: JSON.stringify({ question, step: current() }) }); const data = await response.json(); document.querySelector('#thinking').textContent = data.answer || answer(question); } catch { document.querySelector('#thinking').textContent = answer(question); } }
 manualInput.addEventListener('change', event => { const file = event.target.files[0]; if (file) { state.manualName = file.name; state.step = 0; save(); guide(); } event.target.value = ''; });
 home();
