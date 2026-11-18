@@ -22,17 +22,17 @@ Requires [Bun](https://bun.sh).
 
 ```bash
 bun server.js              # serves the app and /api on http://localhost:3000
-bun test ./server.test.js  # checks that dotfiles and paths outside the repo return 404
+bun test ./server.test.js  # checks that only the front-end files are served
 ```
 
-Camera access needs `localhost` or HTTPS. Demo Mode works with no key. For Live AI Mode against the Bun server, set `OPENAI_API_KEY` in the environment or copy `.env.example` to `.env` (Bun loads it automatically); the Bun server ignores a key pasted into the app. The server returns 404 for any path segment starting with `.`, so `.env` and `.git` are never served.
+Camera access needs `localhost` or HTTPS. Demo Mode works with no key. For Live AI Mode against the Bun server, set `OPENAI_API_KEY` in the environment or copy `.env.example` to `.env` (Bun loads it automatically); the Bun server ignores a key pasted into the app. Besides `/api`, the server only serves the front-end files (`index.html`, `app.js`, `styles.css`, `manifest.webmanifest`, `sw.js`); every other path, including `.env`, `.git` and the server source, returns 404.
 
 The `Dockerfile` runs the same Bun server on port 3000 (override with `PORT`). `.dockerignore` keeps `.env*`, `.git` and `node_modules` out of the image, so pass the key as an environment variable at runtime.
 
 Mobile app (optional):
 
 ```bash
-cd mobile && npm install && npx expo start
+cd mobile && npm ci && npx expo start
 ```
 
 ## Stack
