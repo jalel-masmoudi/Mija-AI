@@ -1,5 +1,7 @@
 # Mija AI
 
+[![CI](https://github.com/jalel-masmoudi/Mija-AI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jalel-masmoudi/Mija-AI/actions/workflows/ci.yml)
+
 Mija AI is a mobile-first web app that walks you through assembling one piece of furniture: a "Nordic bedside cabinet" with a hard-coded 12-step guide. On each step you can ask a question about that step and take a photo of your work to get a pass / fix / unclear check.
 
 Live demo: https://mija-ai.vercel.app
