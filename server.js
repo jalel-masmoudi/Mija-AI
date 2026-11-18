@@ -1,3 +1,5 @@
+import { resolve, sep } from 'node:path';
+
 const root = import.meta.dir;
 const key = Bun.env.OPENAI_API_KEY;
 const json = (body, status = 200) => Response.json(body, { status });
@@ -21,8 +23,11 @@ Bun.serve({ port: Bun.env.PORT || 3000, async fetch(request) {
     try { const { image, step } = await request.json(); return json(await openai([{ role: 'user', content: [{ type: 'input_text', text: `${stepContext(step)}\nInspect this photo. Do not claim certainty when the needed part is obscured. Return practical feedback.` }, { type: 'input_image', image_url: image }] }], { type: 'json_schema', name: 'assembly_verification', strict: true, schema: { type: 'object', properties: { status: { type: 'string', enum: ['pass', 'fix', 'unclear'] }, confidence: { type: 'integer', minimum: 0, maximum: 100 }, message: { type: 'string' }, correction: { type: ['string', 'null'] } }, required: ['status', 'confidence', 'message', 'correction'], additionalProperties: false } })); }
     catch (error) { return json({ error: error.message }, 503); }
   }
-  const path = url.pathname === '/' ? '/index.html' : url.pathname;
-  const file = Bun.file(`${root}${path}`);
-  return await file.exists() ? new Response(file) : new Response('Not found', { status: 404 });
+  let path;
+  try { path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname); } catch { path = '/.'; }
+  const filePath = resolve(root, `.${path}`);
+  const file = Bun.file(filePath);
+  if (path.split(/[/\\]/).some(segment => segment.startsWith('.')) || !filePath.startsWith(root + sep) || !await file.exists()) return new Response('Not found', { status: 404 });
+  return new Response(file);
 }});
 console.log('Mija AI running at http://localhost:3000');
