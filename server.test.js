@@ -1,24 +1,38 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-const port = 3999;
-const base = `http://localhost:${port}`;
-const envPath = `${import.meta.dir}/.env`;
-const createdEnv = !existsSync(envPath);
+const root = mkdtempSync(join(tmpdir(), 'mija-root-'));
+const outside = mkdtempSync(join(tmpdir(), 'mija-outside-'));
 let server;
+let base;
 
 beforeAll(async () => {
-  if (createdEnv) writeFileSync(envPath, 'OPENAI_API_KEY=sk-test\n');
-  server = Bun.spawn(['bun', 'server.js'], { cwd: import.meta.dir, env: { ...process.env, PORT: String(port) }, stdout: 'ignore' });
-  for (let i = 0; i < 50; i++) {
-    try { await fetch(base); return; } catch { await Bun.sleep(100); }
+  for (const file of ['server.js', 'index.html', 'app.js', 'styles.css', 'manifest.webmanifest', 'Dockerfile']) copyFileSync(join(import.meta.dir, file), join(root, file));
+  writeFileSync(join(root, '.env'), 'OPENAI_API_KEY=sk-test\n');
+  mkdirSync(join(root, '.git'));
+  writeFileSync(join(root, '.git', 'config'), '[core]\n');
+  writeFileSync(join(outside, 'secret.txt'), 'sk-outside\n');
+  symlinkSync(join(outside, 'secret.txt'), join(root, 'sw.js'));
+
+  server = Bun.spawn(['bun', 'server.js'], { cwd: root, env: { ...process.env, PORT: '0', OPENAI_API_KEY: '' }, stdout: 'pipe' });
+  const reader = server.stdout.getReader();
+  let log = '';
+  while (!/localhost:\d+/.test(log)) {
+    const { value, done } = await reader.read();
+    if (done) throw new Error(`server did not start: ${log}`);
+    log += new TextDecoder().decode(value);
   }
-  throw new Error('server did not start');
+  reader.releaseLock();
+  base = `http://localhost:${log.match(/localhost:(\d+)/)[1]}`;
 });
 
-afterAll(() => {
+afterAll(async () => {
   server?.kill();
-  if (createdEnv) rmSync(envPath, { force: true });
+  await server?.exited;
+  rmSync(root, { recursive: true, force: true });
+  rmSync(outside, { recursive: true, force: true });
 });
 
 test('serves the app', async () => {
@@ -28,8 +42,13 @@ test('serves the app', async () => {
   expect((await fetch(`${base}/app.js`)).status).toBe(200);
 });
 
-test.each(['/.env', '/.git/config', '/.gitignore', '/%2e%2e/etc/passwd', '/..%2f..%2fetc/passwd', '/%2e/.env', '/%E0%A4%A'])('404 for %s', async path => {
+test.each([
+  '/.env', '/.git/config', '/%2e%2e/etc/passwd', '/..%2f..%2fetc/passwd', '/%2e/.env', '/%E0%A4%A',
+  '/%00', '/%00.env', '/.env%00', '/app.js%00',
+  '/server.js', '/Dockerfile',
+  '/sw.js',
+])('404 for %s', async path => {
   const response = await fetch(`${base}${path}`);
   expect(response.status).toBe(404);
-  expect(await response.text()).not.toContain('sk-');
+  expect(await response.text()).toBe('Not found');
 });
